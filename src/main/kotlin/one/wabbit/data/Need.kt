@@ -1,6 +1,6 @@
 package one.wabbit.data
 
-class Need<out A>(@Volatile private var thunk: Any?) : Cloneable {
+class Need<out A> private constructor(@Volatile private var thunk: Any?) : Cloneable {
     val value: A
         get() {
             val thunk = this.thunk
@@ -110,6 +110,12 @@ class Need<out A>(@Volatile private var thunk: Any?) : Cloneable {
 
         fun <A> defer(a: () -> Need<A>): Need<A> =
             Need(Thunk.FlatMap(unit) { a() })
+
+        fun <A> recursive(f: (Need<A>) -> Need<A>): Need<A> {
+            val result = Need<A>(null)
+            result.thunk = Thunk.FlatMap(unit) { f(result) }
+            return result
+        }
 
         fun <A> now(a: A): Need<A> =
             Need(a)
