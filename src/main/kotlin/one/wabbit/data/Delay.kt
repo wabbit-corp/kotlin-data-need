@@ -1,5 +1,13 @@
 package one.wabbit.data
 
+/**
+ * Represents an abstraction for a delayed computation by wrapping and unwrapping values into a lazily evaluated structure.
+ *
+ * Provides methods for wrapping computations into a `Need`-like structure and extracting them for evaluation.
+ * Additionally, supports recursive and forced evaluation of values using the underlying structure.
+ *
+ * @param A The type of the value managed by the `Delay` interface.
+ */
 interface Delay<A> {
     fun wrap(a: Need<A>): A
     fun unwrap(a: A): Need<A>
