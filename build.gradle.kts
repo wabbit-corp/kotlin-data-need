@@ -10,7 +10,7 @@ repositories {
 }
 
 group   = "one.wabbit"
-version = "1.0.0"
+version = "1.1.0"
 
 plugins {
     kotlin("jvm") version "2.0.20"
@@ -25,7 +25,7 @@ publishing {
     create<MavenPublication>("maven") {
       groupId = "one.wabbit"
       artifactId = "kotlin-data-need"
-      version = "1.0.0"
+      version = "1.1.0"
       from(components["java"])
     }
   }
