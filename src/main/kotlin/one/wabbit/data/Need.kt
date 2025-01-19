@@ -6,6 +6,12 @@ package one.wabbit.data
  * This class provides a way to define potentially expensive computations in a lazy manner and allows them
  * to be composed using functional operations like `map` and `flatMap`.
  *
+ * IMPORTANT CONCURRENCY NOTE:
+ * There is no guarantee of single-evaluation under concurrency. If multiple threads attempt 
+ * to evaluate the same Need simultaneously, they may each perform
+ * redundant work before ultimately converging on the same result.
+ * This design optimizes for single-threaded or low-contention scenarios.
+ *
  * @param A The type of the value encapsulated by this `Need`.
  */
 class Need<out A> private constructor(@Volatile private var thunk: Any?) : Cloneable {
@@ -123,6 +129,11 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) : Clone
         /**
          * Executes a recursive operation within the `Need` context, enabling definitions of lazy recursive computations.
          *
+         * Be cautious when defining your function 'f'. If 'f(result)' 
+         * references 'result' itself in a non-terminating way, you can 
+         * create infinite loops upon evaluation. The function is powerful 
+         * but must be used carefully.
+         *
          * @param f a function that takes a `Need<A>` and returns a transformed `Need<A>`, representing the recursive operation.
          * @return a `Need<A>` instance representing the result of the recursive computation.
          */
@@ -161,6 +172,12 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) : Clone
             var current: Need<Any?> = root
             var stack: StackBase = StackNil
 
+            // We use a manual while-loop with a stack (trampoline) to
+            // unroll nested Map/FlatMap computations. This prevents deep
+            // recursion and potential stack overflows.
+            //
+            // 'current' holds the Need being evaluated at each stage,
+            // and 'stack' accumulates transformations that need to be applied.
             while (true) {
                 val thunk = current.thunk
                 if (thunk !is Thunk<*>) {
