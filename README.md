@@ -1,8 +1,6 @@
-# Lazy Evaluation and Memoization in Kotlin
-
 The "kotlin-data-need" library offers an elegant solution for deferred computation and caching in Kotlin applications. By allowing computations to be evaluated only when needed and caching the results, it provides performance benefits and flexibility in scenarios where efficiency is paramount. The library facilitates lazy evaluation and memoization through its primary component, the `Need` class, which supports transformations and combinations of computations via functional operations like `map`, `flatMap`, and `zip`.
 
-## Installation
+## 🚀  Installation
 
 Add the following dependency to your project:
 
@@ -12,11 +10,11 @@ repositories {
 }
 
 dependencies {
-    implementation("com.github.wabbit-corp:kotlin-data-need:1.0.0")
+    implementation("com.github.wabbit-corp:kotlin-data-need:1.2.0")
 }
 ```
 
-## Usage
+## 🚀  Usage
 
 - **Lazy Initialization**:
   ```kotlin
