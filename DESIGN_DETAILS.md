@@ -58,7 +58,7 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) {
 }
 ```
 
-- The `@Volatile` annotation ensures that if multiple threads read `thunk`, they see a consistent pointer to the underlying state, but this does **not** fully synchronize concurrent evaluation.  
+- The `@Volatile` annotation ensures that if multiple threads read `thunk`, they see a consistent pointer to the underlying state, but this does **not** fully synchronize concurrent evaluation.
 - When you access `value`:
   1. If `thunk` is **already** a final value, it’s returned immediately.
   2. If `thunk` is a `Thunk`, we call `evaluate(this)`, which forces the computation to a final value.
@@ -90,11 +90,11 @@ These two allow **compositional** definitions of lazy computations (often called
 
 The core logic is in the private `evaluate(root: Need<A>)` function. It operates like this:
 
-1. **Setup**:  
+1. **Setup**:
    - Start with `current = root`.
    - Maintain a separate stack structure (`stack`) for pending transformations.
 
-2. **Loop**:  
+2. **Loop**:
    - Repeatedly examine `current.thunk`:
      - If it’s already a plain value (not a `Thunk`), we might pop from the stack, apply a final transformation, and continue.
      - If it’s a `Thunk.Done(value)`, pop from the stack, apply transformations, etc.
@@ -102,10 +102,10 @@ The core logic is in the private `evaluate(root: Need<A>)` function. It operates
      - If it’s `Thunk.FlatMap(left, f)`, push a “FLATMAP” operation on the stack and move `current` to `left`.
    - Eventually, you’ll reduce the chain to a final value.
 
-3. **In-lining**:  
+3. **In-lining**:
    - When the loop finishes evaluating a sub-computation, it “in-lines” the result back into `current.thunk`. This discards the old intermediate structure so that references to partial closures can be GC’d sooner.
 
-4. **Memoization**:  
+4. **Memoization**:
    - Once the root `Need` is fully evaluated, `root.thunk` is assigned the final raw value. This is the key step that ensures subsequent `.value` calls cost O(1).
 
 Because we do it all in a while-loop, we avoid the JVM’s method call stack. This is a common technique also known as **trampolining**.
@@ -123,10 +123,10 @@ Because we do it all in a while-loop, we avoid the JVM’s method call stack. Th
 
 ## 4. Concurrency Nuances
 
-- `Need` is **not fully thread-safe** in the sense of guaranteeing no duplicate evaluations. Two threads racing to evaluate the same `Need` might do redundant work.  
-- The `@Volatile` field ensures that once `thunk` is set to a final value, other threads see that updated reference.  
-- If your computations are pure, the worst-case scenario is duplication of effort. Eventually, both threads converge on the same value.  
-- If you need stronger thread-safety (e.g., guaranteed single evaluation), you would need additional locking or compare-and-set logic—**but** that also increases overhead.  
+- `Need` is **not fully thread-safe** in the sense of guaranteeing no duplicate evaluations. Two threads racing to evaluate the same `Need` might do redundant work.
+- The `@Volatile` field ensures that once `thunk` is set to a final value, other threads see that updated reference.
+- If your computations are pure, the worst-case scenario is duplication of effort. Eventually, both threads converge on the same value.
+- If you need stronger thread-safety (e.g., guaranteed single evaluation), you would need additional locking or compare-and-set logic—**but** that also increases overhead.
 
 ---
 
@@ -137,14 +137,14 @@ Because we do it all in a while-loop, we avoid the JVM’s method call stack. Th
   override fun equals(other: Any?) = this.value == (other as? Need<*>)?.value
   ```
   This forces both `Need`s, which can be expensive if they haven’t already been evaluated.
-- **Hash Code**: Derived from the forced value, meaning that once evaluated, identical final values yield the same hash.  
+- **Hash Code**: Derived from the forced value, meaning that once evaluated, identical final values yield the same hash.
 - **`toString()`**: By default, prints `Need(...)`. If you haven’t forced it yet, you might see references to `Thunk.FlatMap`, etc. If you have forced it, the `thunk` is the final value.
 
 ---
 
 ## 6. Common Use Cases
 
-1. **Delayed/expensive computations**:  
+1. **Delayed/expensive computations**:
    ```kotlin
    val expensive = Need.apply { someLongRunningOperation() }
    // ...
@@ -176,8 +176,8 @@ Because we do it all in a while-loop, we avoid the JVM’s method call stack. Th
 
 ## 8. Performance
 
-- Because we use a while-loop “trampoline,” repeated `map/flatMap` doesn’t blow the stack.  
-- Once forced, subsequent `.value` calls are O(1).  
+- Because we use a while-loop “trampoline,” repeated `map/flatMap` doesn’t blow the stack.
+- Once forced, subsequent `.value` calls are O(1).
 - In concurrent settings, you may see extra computations but generally no data corruption.
 
 ---
@@ -186,8 +186,8 @@ Because we do it all in a while-loop, we avoid the JVM’s method call stack. Th
 
 The `Need` class is effectively a **single-threaded lazy evaluation** monad with partial concurrency support. Its design closely follows the “free monad” or “trampolined computation” pattern often seen in functional programming languages. The approach is:
 
-1. Represent the computation as a chain of `Map` or `FlatMap` thunks.  
-2. Use a manual stack-based evaluation to avoid deep recursion.  
-3. Memoize after the first evaluation by storing the final value in `thunk`.  
+1. Represent the computation as a chain of `Map` or `FlatMap` thunks.
+2. Use a manual stack-based evaluation to avoid deep recursion.
+3. Memoize after the first evaluation by storing the final value in `thunk`.
 
 This yields a flexible, efficient, and relatively easy-to-grok solution for lazy evaluation in Kotlin.

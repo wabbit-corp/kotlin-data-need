@@ -7,7 +7,7 @@ package one.wabbit.data
  * to be composed using functional operations like `map` and `flatMap`.
  *
  * IMPORTANT CONCURRENCY NOTE:
- * There is no guarantee of single-evaluation under concurrency. If multiple threads attempt 
+ * There is no guarantee of single-evaluation under concurrency. If multiple threads attempt
  * to evaluate the same Need simultaneously, they may each perform
  * redundant work before ultimately converging on the same result.
  * This design optimizes for single-threaded or low-contention scenarios.
@@ -113,7 +113,7 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) : Clone
             Need(a)
 
         val unit: Need<Unit> = now(Unit)
-        
+
         fun <A> apply(a: () -> A): Need<A> =
             unit.map { a() }
 
@@ -125,13 +125,13 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) : Clone
          */
         fun <A> defer(a: () -> Need<A>): Need<A> =
             Need(Thunk.FlatMap(unit) { a() })
-        
+
         /**
          * Executes a recursive operation within the `Need` context, enabling definitions of lazy recursive computations.
          *
-         * Be cautious when defining your function 'f'. If 'f(result)' 
-         * references 'result' itself in a non-terminating way, you can 
-         * create infinite loops upon evaluation. The function is powerful 
+         * Be cautious when defining your function 'f'. If 'f(result)'
+         * references 'result' itself in a non-terminating way, you can
+         * create infinite loops upon evaluation. The function is powerful
          * but must be used carefully.
          *
          * @param f a function that takes a `Need<A>` and returns a transformed `Need<A>`, representing the recursive operation.
@@ -166,7 +166,7 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) : Clone
             }
             return result
         }
-        
+
         @Suppress("UNCHECKED_CAST")
         private fun <A> evaluate(root: Need<A>): A {
             var current: Need<Any?> = root
