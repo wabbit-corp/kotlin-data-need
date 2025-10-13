@@ -14,7 +14,7 @@ package one.wabbit.data
  *
  * @param A The type of the value encapsulated by this `Need`.
  */
-class Need<out A> private constructor(@Volatile private var thunk: Any?) : Cloneable {
+class Need<out A> private constructor(@Volatile private var thunk: Any?) {
     /**
      * A lazily evaluated property that computes and caches its result. The value
      * is initially wrapped in a `Thunk`, which can represent either a completed computation
@@ -31,12 +31,14 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) : Clone
         get() {
             val thunk = this.thunk
             if (thunk !is Thunk<*>)
+                @Suppress("UNCHECKED_CAST")
                 return thunk as A
             val result = when (thunk) {
                 is Thunk.Done<*> -> thunk.value
                 else -> evaluate(this)
             }
             this.thunk = result
+            @Suppress("UNCHECKED_CAST")
             return result as A
         }
 
@@ -67,8 +69,6 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) : Clone
      * @return a new `Need` instance containing a pair of values from both `Need` instances.
      */
     infix fun <B> zip(b: Need<B>): Need<Pair<A, B>> = this.flatMap<Pair<A, B>> { a -> b.map { a to it } }
-
-    override fun clone(): Need<A> = this
 
     /**
      * Compares this `Need` instance with another object to determine equality.
@@ -126,6 +126,13 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) : Clone
         fun <A> defer(a: () -> Need<A>): Need<A> =
             Need(Thunk.FlatMap(unit) { a() })
 
+        fun <A, B, Z> zip(a: Need<A>, b: Need<B>, f: (A, B) -> Z): Need<Z> =
+            a.flatMap { aa -> b.map { bb -> f(aa, bb) } }
+        fun <A, B, C, Z> zip(a: Need<A>, b: Need<B>, c: Need<C>, f: (A, B, C) -> Z): Need<Z> =
+            a.flatMap { aa -> b.flatMap { bb -> c.map { cc -> f(aa, bb, cc) } } }
+        fun <A, B, C, D, Z> zip(a: Need<A>, b: Need<B>, c: Need<C>, d: Need<D>, f: (A, B, C, D) -> Z): Need<Z> =
+            a.flatMap { aa -> b.flatMap { bb -> c.flatMap { cc -> d.map { dd -> f(aa, bb, cc, dd) } } } }
+
         /**
          * Executes a recursive operation within the `Need` context, enabling definitions of lazy recursive computations.
          *
@@ -138,8 +145,10 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) : Clone
          * @return a `Need<A>` instance representing the result of the recursive computation.
          */
         fun <A> recursive(f: (Need<A>) -> Need<A>): Need<A> {
-            val result = Need<A>(null)
-            result.thunk = Thunk.FlatMap(unit) { f(result) }
+            // Avoid publishing a Need with a null thunk (data race hazard).
+            val box = arrayOfNulls<Need<A>>(1)
+            val result = Need<A>(Thunk.FlatMap(unit) { f(box[0]!!) })
+            box[0] = result
             return result
         }
 
@@ -167,8 +176,33 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) : Clone
             return result
         }
 
+        fun <K, V : Any> buildNonNull(f: ((K) -> Need<V>, K) -> Need<V>): (K) -> Need<V> {
+            val cache = mutableMapOf<K, V>()
+            val self = object : (K) -> Need<V> {
+                override fun invoke(key: K): Need<V> {
+                    val hit = cache[key]
+                    return if (hit != null) Need.now(hit)
+                    else f(this, key).map { v -> cache.put(key, v); v }
+                }
+            }
+            return self
+        }
+
+        /**
+         * Low-level cast function that bypasses certain runtime checks.
+         *
+         * Normally, a direct cast in Kotlin (`value as B`) involves intrinsics
+         * that can be expensive in tight loops, due to extra type/variance/null/arity checks.
+         * This hack is a small optimization that may help performance-critical code
+         * where casts are guaranteed safe and happen frequently.
+         */
+        @JvmStatic private fun <A, B> unsafeCast(a: A): B {
+            @Suppress("UNCHECKED_CAST")
+            return a as B
+        }
+
         @Suppress("UNCHECKED_CAST")
-        private fun <A> evaluate(root: Need<A>): A {
+        @JvmStatic private fun <A> evaluate(root: Need<A>): A {
             var current: Need<Any?> = root
             var stack: StackBase = StackNil
 
@@ -222,13 +256,13 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) : Clone
                     }
                     is Thunk.FlatMap<*, *> -> {
                         val l = thunk.left
-                        val f = thunk.f as (Any?) -> Need<Any?>
+                        val f: (Any?) -> Need<Any?> = unsafeCast(thunk.f)
                         stack = StackElement(StackAction.FLATMAP, current, f, stack)
                         current = l
                     }
                     is Thunk.Map<*, *> -> {
                         val l = thunk.left
-                        val f = thunk.f as (Any?) -> Any?
+                        val f: (Any?) -> Any? = unsafeCast(thunk.f)
                         stack = StackElement(StackAction.MAP, current, f, stack)
                         current = l
                     }
