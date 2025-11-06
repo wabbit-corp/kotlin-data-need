@@ -1,6 +1,6 @@
 package one.wabbit.data
 
-import java.util.*
+import java.util.SplittableRandom
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
@@ -9,17 +9,15 @@ import kotlin.test.assertTrue
 
 class NeedSpec {
     enum class Type {
-        Bool, Int
+        Bool,
+        Int,
     }
 
     data class Value<T>(val need: Need<T>, val actual: T) {
-        fun <U> map(f: (T) -> U): Value<U> {
-            return Value(need.map(f), f(actual))
-        }
+        fun <U> map(f: (T) -> U): Value<U> = Value(need.map(f), f(actual))
 
-        fun <U> flatMap(f: (T) -> Value<U>): Value<U> {
-            return Value(need.flatMap { f(it).need }, f(actual).actual)
-        }
+        fun <U> flatMap(f: (T) -> Value<U>): Value<U> =
+            Value(need.flatMap { f(it).need }, f(actual).actual)
     }
 
     class State {
@@ -37,10 +35,11 @@ class NeedSpec {
 
             val r = random.nextBoolean()
             val result: Value<Boolean>
-            if (random.nextBoolean())
+            if (random.nextBoolean()) {
                 result = Value(Need.now(r), r)
-            else
+            } else {
                 result = Value(Need.apply { r }, r)
+            }
             thunks.getOrPut(Type.Bool) { mutableListOf() }.add(result)
             return result
         }
@@ -56,10 +55,11 @@ class NeedSpec {
 
             val r = random.nextInt(10)
             val result: Value<Int>
-            if (random.nextBoolean())
+            if (random.nextBoolean()) {
                 result = Value(Need.now(r), r)
-            else
+            } else {
                 result = Value(Need.apply { r }, r)
+            }
             thunks.getOrPut(Type.Int) { mutableListOf() }.add(result)
             return result
         }
@@ -77,11 +77,7 @@ class NeedSpec {
                     2 -> {
                         val left = state.nextSimpleBool()
                         val right = state.nextSimpleBool()
-                        return left.flatMap { l ->
-                            right.map { r ->
-                                l && r
-                            }
-                        }
+                        return left.flatMap { l -> right.map { r -> l && r } }
                     }
                     3 -> {
                         val left = state.nextSimpleInt()
@@ -100,11 +96,7 @@ class NeedSpec {
                     2 -> {
                         val left = state.nextSimpleInt()
                         val right = state.nextSimpleInt()
-                        return left.flatMap { l ->
-                            right.map { r ->
-                                l + r
-                            }
-                        }
+                        return left.flatMap { l -> right.map { r -> l + r } }
                     }
                     3 -> {
                         val left = state.nextSimpleBool()
@@ -144,23 +136,29 @@ class NeedSpec {
     @Test
     fun recursive_does_not_race_or_null() {
         // Fibonacci with memoization through Need.build, to exercise recursive + build.
-        val fib = Need.build<Int, Int> { self, k ->
-            when (k) {
-                0, 1 -> Need.now(1)
-                else -> Need.zip(self(k - 1), self(k - 2)) { a, b -> a!! + b!! }
+        val fib =
+            Need.build<Int, Int> { self, k ->
+                when (k) {
+                    0,
+                    1 -> Need.now(1)
+                    else -> Need.zip(self(k - 1), self(k - 2)) { a, b -> a!! + b!! }
+                }
             }
+        listOf(0 to 1, 1 to 1, 2 to 2, 3 to 3, 4 to 5, 5 to 8, 6 to 13).forEach { (k, v) ->
+            assertEquals(v, fib(k).value)
         }
-        listOf(0 to 1, 1 to 1, 2 to 2, 3 to 3, 4 to 5, 5 to 8, 6 to 13)
-            .forEach { (k, v) -> assertEquals(v, fib(k).value) }
     }
 
     @Test
     fun concurrent_evaluations_converge() {
-        val n = Need.apply { Thread.sleep(10); 42 }
+        val n =
+            Need.apply {
+                Thread.sleep(10)
+                42
+            }
         val pool = Executors.newFixedThreadPool(16)
-        val results = (1..64).map {
-            pool.submit<Int> { n.value }
-        }.map { it.get(1, TimeUnit.SECONDS) }
+        val results =
+            (1..64).map { pool.submit<Int> { n.value } }.map { it.get(1, TimeUnit.SECONDS) }
         pool.shutdown()
         assertTrue(results.all { it == 42 })
     }
