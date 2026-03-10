@@ -18,15 +18,37 @@ plugins {
     kotlin("plugin.serialization")
 
     id("maven-publish")
+
+    id("com.vanniktech.maven.publish")
 }
 
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            groupId = "one.wabbit"
-            artifactId = "kotlin-data-need"
-            version = "1.2.0"
-            from(components["java"])
+mavenPublishing {
+    coordinates("one.wabbit", "kotlin-data-need", "1.2.0")
+    publishToMavenCentral()
+    signAllPublications()
+    pom {
+        name.set("kotlin-data-need")
+        description.set("kotlin-data-need")
+        url.set("https://github.com/wabbit-corp/kotlin-data-need")
+        licenses {
+            license {
+                name.set("GNU Affero General Public License v3.0 or later")
+                url.set("https://spdx.org/licenses/AGPL-3.0-or-later.html")
+            }
+        }
+        developers {
+            developer {
+                id.set("wabbit-corp")
+                name.set("Wabbit Consulting Corporation")
+
+                email.set("wabbit@wabbit.one")
+
+            }
+        }
+        scm {
+            url.set("https://github.com/wabbit-corp/kotlin-data-need")
+            connection.set("scm:git:git://github.com/wabbit-corp/kotlin-data-need.git")
+            developerConnection.set("scm:git:ssh://git@github.com/wabbit-corp/kotlin-data-need.git")
         }
     }
 }
@@ -40,6 +62,41 @@ dependencies {
 java {
     targetCompatibility = JavaVersion.toVersion(21)
     sourceCompatibility = JavaVersion.toVersion(21)
+}
+
+tasks.register("printVersion") {
+    doLast {
+        println(project.version.toString())
+    }
+}
+
+tasks.register("assertReleaseVersion") {
+    doLast {
+        val versionString = project.version.toString()
+        require(!versionString.endsWith("+dev-SNAPSHOT")) {
+            "Release publishing requires a non-snapshot version, got $versionString"
+        }
+        val refType = System.getenv("GITHUB_REF_TYPE") ?: ""
+        val refName = System.getenv("GITHUB_REF_NAME") ?: ""
+        if (refType == "tag" && refName.isNotBlank()) {
+            val expectedTag = "v$versionString"
+            require(refName == expectedTag) {
+                "Git tag $refName does not match project version $versionString"
+            }
+        }
+    }
+}
+
+tasks.register("assertSnapshotVersion") {
+    doLast {
+        val versionString = project.version.toString()
+        require(versionString.endsWith("+dev-SNAPSHOT")) {
+            "Snapshot publishing requires a +dev-SNAPSHOT version, got $versionString"
+        }
+        require((System.getenv("GITHUB_REF_TYPE") ?: "") != "tag") {
+            "Snapshot publishing must not run from a tag ref"
+        }
+    }
 }
 
 tasks {
