@@ -1,5 +1,7 @@
 package one.wabbit.data
 
+import kotlin.concurrent.Volatile
+
 /**
  * Represents a lazy computation that only evaluates its value when needed and caches the result for
  * future accesses.
