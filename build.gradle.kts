@@ -1,5 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+
 repositories {
     google()
 
@@ -86,6 +88,19 @@ kotlin {
         namespace = "one.wabbit.data.need"
         compileSdk = 34
         minSdk = 26
+    }
+
+    iosArm64()
+
+    iosSimulatorArm64()
+
+    macosArm64("hostNative")
+
+    targets.withType(KotlinNativeTarget::class.java).configureEach {
+        binaries.framework {
+            baseName = "DataNeed"
+            isStatic = true
+        }
     }
 
     sourceSets {

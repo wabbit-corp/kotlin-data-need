@@ -245,14 +245,12 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) {
          * small optimization that may help performance-critical code where casts are guaranteed
          * safe and happen frequently.
          */
-        @JvmStatic
         private fun <A, B> unsafeCast(a: A): B {
             @Suppress("UNCHECKED_CAST")
             return a as B
         }
 
         @Suppress("UNCHECKED_CAST")
-        @JvmStatic
         private fun <A> evaluate(root: Need<A>): A {
             var current: Need<Any?> = root
             var stack: StackBase = StackNil
