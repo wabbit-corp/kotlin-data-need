@@ -65,8 +65,26 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) {
      */
     fun <B> flatMap(f: (A) -> Need<B>): Need<B> = Need(Thunk.FlatMap(this, f))
 
+    /**
+     * Sequences this computation before [b] and returns [b]'s value.
+     *
+     * This is useful when this `Need` represents a prerequisite that must be forced before another
+     * lazy value, but the prerequisite value itself should not appear in the result.
+     *
+     * @param b the computation whose value is returned after this computation has been evaluated.
+     * @return a lazy computation that evaluates this `Need`, then evaluates and returns [b].
+     */
     infix fun <B> zipLeft(b: Need<B>): Need<B> = this.flatMap { b }
 
+    /**
+     * Sequences [b] after this computation and keeps this computation's value.
+     *
+     * The returned `Need` forces [b] for its evaluation effect or dependency ordering, but discards
+     * [b]'s value and returns the value produced by this `Need`.
+     *
+     * @param b the computation to evaluate after this one.
+     * @return a lazy computation that evaluates both inputs and returns this `Need`'s value.
+     */
     infix fun <B> zipRight(b: Need<B>): Need<A> = this.flatMap { a -> b.map { a } }
 
     /**
@@ -91,8 +109,18 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) {
         return this.value == other.value
     }
 
+    /**
+     * Returns the hash code of the forced value.
+     *
+     * Calling this property forces evaluation if this `Need` has not already been evaluated.
+     */
     override fun hashCode(): Int = this.value.hashCode()
 
+    /**
+     * Returns a diagnostic representation of the current lazy state.
+     *
+     * The exact output is not a stable serialization format.
+     */
     override fun toString(): String = "Need($thunk)"
 
     /**
@@ -121,6 +149,13 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) {
         FLATMAP,
     }
 
+    /**
+     * Marker for the evaluator's internal stack representation.
+     *
+     * This type is visible as part of the current public binary API, but user code should not rely
+     * on it. Supported interaction with `Need` goes through [value], [map], [flatMap], and the
+     * companion helpers.
+     */
     sealed interface StackBase
 
     private data object StackNil : StackBase
@@ -132,11 +167,39 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) {
         val tail: StackBase,
     ) : StackBase
 
+    /**
+     * Factory, composition, recursion, and memoization helpers for [Need].
+     */
     companion object {
+        /**
+         * Wraps an already available value in a `Need`.
+         *
+         * The returned instance is already evaluated, so reading [Need.value] returns [a] without
+         * invoking any delayed computation.
+         *
+         * @param a the value to wrap.
+         * @return an evaluated `Need` containing [a].
+         */
         fun <A> now(a: A): Need<A> = Need(a)
 
+        /**
+         * An already evaluated `Need` containing [Unit].
+         *
+         * This value is used internally as a neutral starting point for delayed computations and is
+         * also useful when caller code needs a shared no-op lazy value.
+         */
         val unit: Need<Unit> = now(Unit)
 
+        /**
+         * Delays execution of a strict computation.
+         *
+         * The function [a] is not invoked until the returned `Need` is forced. Its result is cached
+         * after evaluation, subject to the class-level concurrency caveat that concurrent forcing can
+         * duplicate in-flight work.
+         *
+         * @param a the computation to evaluate lazily.
+         * @return a `Need` that evaluates [a] on demand.
+         */
         fun <A> apply(a: () -> A): Need<A> = unit.map { a() }
 
         /**
@@ -149,12 +212,45 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) {
          */
         fun <A> defer(a: () -> Need<A>): Need<A> = Need(Thunk.FlatMap(unit) { a() })
 
+        /**
+         * Combines two lazy values with [f].
+         *
+         * Neither input is forced until the returned `Need` is forced.
+         *
+         * @param a the first lazy value.
+         * @param b the second lazy value.
+         * @param f the function used to combine the forced values.
+         * @return a lazy computation containing the result of [f].
+         */
         fun <A, B, Z> zip(a: Need<A>, b: Need<B>, f: (A, B) -> Z): Need<Z> =
             a.flatMap { aa -> b.map { bb -> f(aa, bb) } }
 
+        /**
+         * Combines three lazy values with [f].
+         *
+         * None of the inputs are forced until the returned `Need` is forced.
+         *
+         * @param a the first lazy value.
+         * @param b the second lazy value.
+         * @param c the third lazy value.
+         * @param f the function used to combine the forced values.
+         * @return a lazy computation containing the result of [f].
+         */
         fun <A, B, C, Z> zip(a: Need<A>, b: Need<B>, c: Need<C>, f: (A, B, C) -> Z): Need<Z> =
             a.flatMap { aa -> b.flatMap { bb -> c.map { cc -> f(aa, bb, cc) } } }
 
+        /**
+         * Combines four lazy values with [f].
+         *
+         * None of the inputs are forced until the returned `Need` is forced.
+         *
+         * @param a the first lazy value.
+         * @param b the second lazy value.
+         * @param c the third lazy value.
+         * @param d the fourth lazy value.
+         * @param f the function used to combine the forced values.
+         * @return a lazy computation containing the result of [f].
+         */
         fun <A, B, C, D, Z> zip(
             a: Need<A>,
             b: Need<B>,
@@ -218,6 +314,16 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) {
             return result
         }
 
+        /**
+         * Builds a memoized recursive resolver for non-null values.
+         *
+         * The returned function looks up each key in an internal cache before invoking [f]. Results
+         * produced by [f] are cached after their returned `Need` is forced.
+         *
+         * @param f the resolver function. The first argument is the memoized function being built,
+         *   which allows recursive dependency lookups. The second argument is the key to resolve.
+         * @return a memoized function from keys to lazy non-null values.
+         */
         fun <K, V : Any> buildNonNull(f: ((K) -> Need<V>, K) -> Need<V>): (K) -> Need<V> {
             val cache = mutableMapOf<K, V>()
             val self =
