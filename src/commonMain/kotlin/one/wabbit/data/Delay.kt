@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 package one.wabbit.data
 
 /**
@@ -58,9 +60,7 @@ interface Delay<A> {
         return thunk.value
     }
 
-    /**
-     * Constructors for the supported delay representations.
-     */
+    /** Constructors for the supported delay representations. */
     companion object {
         /**
          * Returns a delay representation that stores plain strict values.

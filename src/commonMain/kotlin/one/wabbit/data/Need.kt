@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 package one.wabbit.data
 
 import kotlin.concurrent.Volatile
@@ -167,9 +169,7 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) {
         val tail: StackBase,
     ) : StackBase
 
-    /**
-     * Factory, composition, recursion, and memoization helpers for [Need].
-     */
+    /** Factory, composition, recursion, and memoization helpers for [Need]. */
     companion object {
         /**
          * Wraps an already available value in a `Need`.
@@ -194,8 +194,8 @@ class Need<out A> private constructor(@Volatile private var thunk: Any?) {
          * Delays execution of a strict computation.
          *
          * The function [a] is not invoked until the returned `Need` is forced. Its result is cached
-         * after evaluation, subject to the class-level concurrency caveat that concurrent forcing can
-         * duplicate in-flight work.
+         * after evaluation, subject to the class-level concurrency caveat that concurrent forcing
+         * can duplicate in-flight work.
          *
          * @param a the computation to evaluate lazily.
          * @return a `Need` that evaluates [a] on demand.

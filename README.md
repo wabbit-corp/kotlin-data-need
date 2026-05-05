@@ -1,12 +1,19 @@
 # kotlin-data-need
 
+![](./.meta/github-project-banner.png)
+
+<p align=center>
+    <img src="https://img.shields.io/maven-central/v/one.wabbit/kotlin-data-need" alt="Maven Central">
+    <img src="https://img.shields.io/badge/Kotlin-Multiplatform-7F52FF" alt="Kotlin Multiplatform">
+</p>
+
 `kotlin-data-need` is a Kotlin Multiplatform library for lazy computations that can be composed,
 evaluated on demand, and cached after evaluation.
 
 It is designed for code that needs explicit laziness without tying the public API to JVM-only
 `Lazy`, coroutine primitives, or an application-specific memoization layer.
 
-## Installation
+## 🚀 Installation
 
 ```kotlin
 repositories {
@@ -18,7 +25,7 @@ dependencies {
 }
 ```
 
-## Quick Start
+## 🚀 Usage
 
 ```kotlin
 import one.wabbit.data.Need
